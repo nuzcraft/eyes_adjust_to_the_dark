@@ -7,6 +7,7 @@ extern crate rand;
 use std::cmp;
 use tcod::console::*;
 use tcod::colors::{self, Color};
+use tcod::map::{Map as FovMap, FovAlgorithm};
 use rand::Rng;
 
 // const are constants that cannot be changed in code
@@ -23,7 +24,14 @@ const ROOM_MIN_SIZE: i32 = 6;
 const MAX_ROOMS: i32 = 30;
 
 const COLOR_DARK_WALL: Color = Color{r: 0, g: 0, b: 100};
+const COLOR_LIGHT_WALL: Color = Color{r: 130, g: 110, b: 50};
 const COLOR_DARK_GROUND: Color = Color{r: 50, g: 50, b: 150};
+const COLOR_LIGHT_GROUND: Color = Color{r: 200, g: 180, b: 50};
+
+//fov
+const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic;
+const FOV_LIGHT_WALLS: bool = true;
+const TORCH_RADIUS: i32 = 10;
 
 /// main function of the game, starts with initializers, then moves into the main game loop
 fn main() {
@@ -42,6 +50,15 @@ fn main() {
 
     // map
     let (map, (player_x, player_y)) = make_map();
+    // fov map
+    let mut fov_map = FovMap::new(MAP_WIDTH, MAP_HEIGHT);
+    for y in 0..MAP_HEIGHT {
+        for x in 0..MAP_WIDTH {
+            fov_map.set(x, y, 
+                        !map[x as usize][y as usize].block_sight,
+                        !map[x as usize][y as usize].blocked);
+        }
+    }
 
     // player variables
     let player = Object::new(player_x, player_y, '@', colors::WHITE);
