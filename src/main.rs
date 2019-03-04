@@ -1,5 +1,4 @@
 /// Rust/libtcod tutorial, with notes
-/// test note
 
 // tcod is an external crate (and is referenced in the Cargo.toml file)
 extern crate tcod;
