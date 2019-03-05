@@ -7,7 +7,8 @@ extern crate rand;
 use std::cmp;
 use tcod::console::*;
 use tcod::colors::{self, Color};
-use tcod::map::{Map as FovMap, FovAlgorithm};
+use tcod::map::{Map as FovMap, FovAlgorithm}; // the 'Map as FovMap' section renames the tcod fov map
+                                              // so that it doesn't conflict with our user defined Map
 use rand::Rng;
 
 // const are constants that cannot be changed in code
@@ -19,6 +20,7 @@ const LIMIT_FPS: i32 = 20; // limit frames per second
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 45;
 
+// parameters for dungeon generator
 const ROOM_MAX_SIZE: i32 = 10;
 const ROOM_MIN_SIZE: i32 = 6;
 const MAX_ROOMS: i32 = 30;
@@ -30,85 +32,13 @@ const COLOR_LIGHT_GROUND: Color = Color{r: 200, g: 180, b: 50};
 
 //fov
 const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic;
-const FOV_LIGHT_WALLS: bool = true;
+const FOV_LIGHT_WALLS: bool = true; // light walls or not
 const TORCH_RADIUS: i32 = 10;
 
-/// main function of the game, starts with initializers, then moves into the main game loop
-fn main() {
-    
-    let mut root = Root::initializer()
-        .font("arial10x10.png", FontLayout::Tcod) // set up a font. this can be in various formats, must be in the root, next to Cargo.toml
-        .font_type(FontType::Greyscale)
-        .size(SCREEN_WIDTH, SCREEN_HEIGHT) // set the dimensions of the window
-        .title("Rust/libtcod tutorial") // name the window
-        .init(); // this actually opens the window
+type Map = Vec<Vec<Tile>>; // a MAP is 2 dimensional vector of tiles
 
-    let mut con = Offscreen::new(MAP_WIDTH, MAP_HEIGHT); // create an offscreen console the same width and height as the root
-    // we'll blit this to the root screen when we're ready    
-
-    tcod::system::set_fps(LIMIT_FPS); // set the frames per second; limits the refresh rate
-
-    // map
-    let (map, (player_x, player_y)) = make_map();
-    // fov map
-    let mut fov_map = FovMap::new(MAP_WIDTH, MAP_HEIGHT);
-    for y in 0..MAP_HEIGHT {
-        for x in 0..MAP_WIDTH {
-            fov_map.set(x, y, 
-                        !map[x as usize][y as usize].block_sight,
-                        !map[x as usize][y as usize].blocked);
-        }
-    }
-
-    // player variables
-    let player = Object::new(player_x, player_y, '@', colors::WHITE);
-    let npc = Object::new(SCREEN_WIDTH / 2 - 5, SCREEN_HEIGHT / 2, '@', colors::YELLOW);
-    let mut objects = [player, npc];
-
-    // main game loop
-    while !root.window_closed() {
-        con.set_default_foreground(colors::WHITE); // this is the color everything will be drawn in unless otherwise specified
-        root.clear(); // clear the screen
-        render_all(&mut root, &mut con, &objects, &map);
-        root.flush(); // draw everything to the window
-        for object in &objects {
-            object.clear(&mut con);
-        }
-        // handle keys and exit game if needed
-        let player = &mut objects[0];
-        let exit = handle_keys(&mut root, player, &map);
-        if exit {
-            break
-        }
-    }
-
-}
-
-/// this function will handle all interactions from the player
-/// this will return false if the player wants to continue playing, true to quit
-fn handle_keys(root: &mut Root, player: &mut Object, map: &Map) -> bool {
-
-    use tcod::input::Key;
-    use tcod::input::KeyCode::*;
-
-    let key = root.wait_for_keypress(true);
-    match key {
-        Key {code: Enter, alt: true, ..} => {
-            // Alt+Enter: toggel fullscreen
-            let fullscreen = root.is_fullscreen();
-            root.set_fullscreen(!fullscreen);
-        },
-        Key {code: Escape, ..} => return true,
-        // movement keys
-        Key {code: Up, ..} => player.move_by(0, -1, map),
-        Key {code: Down, ..} => player.move_by(0, 1, map),
-        Key {code: Left, ..} => player.move_by(-1, 0, map),
-        Key {code: Right, ..} => player.move_by(1, 0, map),
-        _ => {},
-    }
-    false
-}
-
+// this is a generic object. Anything represented by a character on the screen
+// player, monster, stairs, item, etc
 #[derive(Debug)]
 struct Object {
     x: i32,
@@ -147,23 +77,131 @@ impl Object {
     }
 }
 
+// a tile of the map and its properties
 #[derive(Clone, Copy, Debug)]
 struct Tile {
     blocked: bool,
     block_sight: bool,
+    explored: bool,
 }
 
 impl Tile {
     pub fn empty() -> Self {
-        Tile{blocked: false, block_sight: false}
+        Tile{blocked: false, block_sight: false, explored: false}
     }
 
     pub fn wall() -> Self {
-        Tile{blocked: true, block_sight: true}
+        Tile{blocked: true, block_sight: true, explored: false}
     }
 }
 
-type Map = Vec<Vec<Tile>>;
+// a simple rectangle on the map, used to define a room
+#[derive(Clone, Copy, Debug)]
+struct Rect {
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
+}
+
+impl Rect {
+    pub fn new (x: i32, y: i32, w: i32, h: i32) -> Self {
+        Rect{x1: x, y1: y, x2: x + w, y2: y + h}
+    }
+
+    pub fn center(&self) -> (i32, i32) {
+        let center_x = (self.x1 + self.x2) / 2;
+        let center_y = (self.y1 + self.y2) / 2;
+        (center_x, center_y)
+    }
+
+    pub fn intersects_with(&self, other: &Rect) -> bool {
+        // return true if this rectangle intersects with another one
+        (self.x1 <= other.x2) && (self.x2 >= other.x1) &&
+            (self.y1 <= other.y2) && (self.y2 >= other.y1)
+    }
+}
+
+/// main function of the game, starts with initializers, then moves into the main game loop
+fn main() {
+    
+    let mut root = Root::initializer()
+        .font("arial10x10.png", FontLayout::Tcod) // set up a font. this can be in various formats, must be in the root, next to Cargo.toml
+        .font_type(FontType::Greyscale)
+        .size(SCREEN_WIDTH, SCREEN_HEIGHT) // set the dimensions of the window
+        .title("Rust/libtcod tutorial") // name the window
+        .init(); // this actually opens the window
+
+    let mut con = Offscreen::new(MAP_WIDTH, MAP_HEIGHT); // create an offscreen console the same width and height as the root
+    // we'll blit this to the root screen when we're ready    
+
+    tcod::system::set_fps(LIMIT_FPS); // set the frames per second; limits the refresh rate
+
+    // map
+    let (mut map, (player_x, player_y)) = make_map();
+    // fov map
+    // this creates an fovmap with the same dimensions as the entire map. it includes every
+    // tile's position, and whether its transparent and walkable
+    let mut fov_map = FovMap::new(MAP_WIDTH, MAP_HEIGHT);
+    for y in 0..MAP_HEIGHT {
+        for x in 0..MAP_WIDTH {
+            fov_map.set(x, y, 
+                        !map[x as usize][y as usize].block_sight,
+                        !map[x as usize][y as usize].blocked);
+        }
+    }
+
+    // player variables
+    let player = Object::new(player_x, player_y, '@', colors::WHITE);
+    let mut previous_player_position = (-1, -1);
+    let npc = Object::new(player_x + 1, player_y / 2, '@', colors::BLACK);
+    let mut objects = [player, npc];
+
+    // main game loop
+    while !root.window_closed() {
+        con.set_default_foreground(colors::WHITE); // this is the color everything will be drawn in unless otherwise specified
+        root.clear(); // clear the screen
+        let fov_recompute = previous_player_position != (objects[0].x, objects[0].y); // only recompute fov if the player moved
+        render_all(&mut root, &mut con, &objects, &mut map, &mut fov_map, fov_recompute); // render everything
+        root.flush(); // draw everything to the window
+        for object in &objects {
+            object.clear(&mut con);
+        }
+        // handle keys and exit game if needed
+        let player = &mut objects[0];
+        previous_player_position = (player.x, player.y);
+        let exit = handle_keys(&mut root, player, &map);
+        if exit {
+            break
+        }
+    }
+
+}
+
+/// this function will handle all interactions from the player
+/// this will return false if the player wants to continue playing, true to quit
+fn handle_keys(root: &mut Root, player: &mut Object, map: &Map) -> bool {
+
+    use tcod::input::Key;
+    use tcod::input::KeyCode::*;
+
+    let key = root.wait_for_keypress(true);
+    match key {
+        Key {code: Enter, alt: true, ..} => {
+            // Alt+Enter: toggel fullscreen
+            let fullscreen = root.is_fullscreen();
+            root.set_fullscreen(!fullscreen);
+        },
+        Key {code: Escape, ..} => return true,
+        // movement keys
+        Key {code: Up, ..} => player.move_by(0, -1, map),
+        Key {code: Down, ..} => player.move_by(0, 1, map),
+        Key {code: Left, ..} => player.move_by(-1, 0, map),
+        Key {code: Right, ..} => player.move_by(1, 0, map),
+        _ => {},
+    }
+    false
+}
 
 fn make_map() -> (Map, (i32, i32)) {
     // fill map with "unblocked" tiles
@@ -225,51 +263,45 @@ fn make_map() -> (Map, (i32, i32)) {
 }
 
 /// this function will handle all the rendering needed
-fn render_all(root: &mut Root, con: &mut Offscreen, objects: &[Object], map: &Map) {
+fn render_all(root: &mut Root, con: &mut Offscreen, objects: &[Object], map: &mut Map, fov_map: &mut FovMap, fov_recompute: bool) {
+    if fov_recompute {
+        // recompute FOV if needed (the player moved or something)
+        let player = &objects[0];
+        fov_map.compute_fov(player.x, player.y, TORCH_RADIUS, FOV_LIGHT_WALLS, FOV_ALGO);
+
+        // draw the map tiles, setting background colors
+        for y in 0..MAP_HEIGHT {
+            for x in 0..MAP_WIDTH {
+                let visible = fov_map.is_in_fov(x, y);
+                let wall = map[x as usize][y as usize].block_sight;
+                let color = match(visible, wall) {
+                    // outside field of view
+                    (false, true) => COLOR_DARK_WALL,
+                    (false, false) => COLOR_DARK_GROUND,
+                    // inside fov:COLOR_DARK_GROUND
+                    (true, true) => COLOR_LIGHT_WALL,
+                    (true, false) => COLOR_LIGHT_GROUND,    
+                };
+                let explored = &mut map[x as usize][y as usize].explored;
+                if visible {
+                    // since it's visible, explore it
+                    *explored = true;
+                }
+                if *explored {
+                    con.set_char_background(x, y, color, BackgroundFlag::Set);
+                }
+            }
+        }
+    }
     // draw all objects in the list
     for object in objects {
-        object.draw(con);
-    }
-    // draw the map tiles
-    for y in 0..MAP_HEIGHT {
-        for x in 0..MAP_WIDTH {
-            let wall = map[x as usize][y as usize].block_sight;
-            if wall {
-                con.set_char_background(x, y, COLOR_DARK_WALL, BackgroundFlag::Set);
-            } else {
-                con.set_char_background(x, y, COLOR_DARK_GROUND, BackgroundFlag::Set);
-            }
+        if fov_map.is_in_fov(object.x, object.y) {
+            object.draw(con);
         }
     }
 
     blit(con, (0, 0), (MAP_WIDTH, MAP_HEIGHT), root, (0, 0), 1.0, 1.0); // blit the con to the root
 
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Rect {
-    x1: i32,
-    y1: i32,
-    x2: i32,
-    y2: i32,
-}
-
-impl Rect {
-    pub fn new (x: i32, y: i32, w: i32, h: i32) -> Self {
-        Rect{x1: x, y1: y, x2: x + w, y2: y + h}
-    }
-
-    pub fn center(&self) -> (i32, i32) {
-        let center_x = (self.x1 + self.x2) / 2;
-        let center_y = (self.y1 + self.y2) / 2;
-        (center_x, center_y)
-    }
-
-    pub fn intersects_with(&self, other: &Rect) -> bool {
-        // return true if this rectangle intersects with another one
-        (self.x1 <= other.x2) && (self.x2 >= other.x1) &&
-            (self.y1 <= other.y2) && (self.y2 >= other.y1)
-    }
 }
 
 fn create_room(room: Rect, map: &mut Map) {
