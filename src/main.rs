@@ -24,6 +24,7 @@ const MAP_HEIGHT: i32 = 45;
 const ROOM_MAX_SIZE: i32 = 10;
 const ROOM_MIN_SIZE: i32 = 6;
 const MAX_ROOMS: i32 = 30;
+const MAX_ROOM_MONSTERS: i32 = 3;
 
 const COLOR_DARK_WALL: Color = Color{r: 0, g: 0, b: 100};
 const COLOR_LIGHT_WALL: Color = Color{r: 130, g: 110, b: 50};
@@ -34,6 +35,9 @@ const COLOR_LIGHT_GROUND: Color = Color{r: 200, g: 180, b: 50};
 const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic;
 const FOV_LIGHT_WALLS: bool = true; // light walls or not
 const TORCH_RADIUS: i32 = 10;
+
+// player will always be the first object
+const PLAYER: usize = 0;
 
 type Map = Vec<Vec<Tile>>; // a MAP is 2 dimensional vector of tiles
 
@@ -60,8 +64,7 @@ impl Object {
     pub fn move_by(&mut self, dx: i32, dy: i32, map: &Map) {
         // move by the given amount
         if !map[(self.x + dx) as usize][(self.y + dy) as usize].blocked {
-            self.x += dx;
-            self.y += dy;
+            self.set_pos(self.x + dx, self.y + dy);
         }
     }
 
@@ -74,6 +77,17 @@ impl Object {
     /// Erase the character that represents this object
     pub fn clear(&self, con: &mut Console) {
         con.put_char(self.x, self.y, ' ', BackgroundFlag::None);
+    }
+
+    // returns the current position
+    pub fn pos(&self) -> (i32, i32) {
+        (self.x, self.y)
+    }
+
+    // sets a new position for an object
+    pub fn set_pos(&mut self, x: i32, y: i32) {
+        self.x = x;
+        self.y = y;
     }
 }
 
@@ -137,8 +151,12 @@ fn main() {
 
     tcod::system::set_fps(LIMIT_FPS); // set the frames per second; limits the refresh rate
 
+    // player variables
+    let player = Object::new(0, 0, '@', colors::WHITE);
+    let mut objects = vec![player];
+
     // map
-    let (mut map, (player_x, player_y)) = make_map();
+    let mut map = make_map(&mut objects);
     // fov map
     // this creates an fovmap with the same dimensions as the entire map. it includes every
     // tile's position, and whether its transparent and walkable
@@ -151,25 +169,21 @@ fn main() {
         }
     }
 
-    // player variables
-    let player = Object::new(player_x, player_y, '@', colors::WHITE);
-    let mut previous_player_position = (-1, -1);
-    let npc = Object::new(player_x + 1, player_y / 2, '@', colors::BLACK);
-    let mut objects = [player, npc];
+    let mut previous_player_position = (-1, -1);    
 
     // main game loop
     while !root.window_closed() {
         con.set_default_foreground(colors::WHITE); // this is the color everything will be drawn in unless otherwise specified
         root.clear(); // clear the screen
-        let fov_recompute = previous_player_position != (objects[0].x, objects[0].y); // only recompute fov if the player moved
+        let fov_recompute = previous_player_position != (objects[PLAYER].x, objects[PLAYER].y); // only recompute fov if the player moved
         render_all(&mut root, &mut con, &objects, &mut map, &mut fov_map, fov_recompute); // render everything
         root.flush(); // draw everything to the window
         for object in &objects {
             object.clear(&mut con);
         }
         // handle keys and exit game if needed
-        let player = &mut objects[0];
-        previous_player_position = (player.x, player.y);
+        let player = &mut objects[PLAYER];
+        previous_player_position = player.pos();
         let exit = handle_keys(&mut root, player, &map);
         if exit {
             break
@@ -203,12 +217,11 @@ fn handle_keys(root: &mut Root, player: &mut Object, map: &Map) -> bool {
     false
 }
 
-fn make_map() -> (Map, (i32, i32)) {
+fn make_map(objects: &mut Vec<Object>) -> Map {
     // fill map with "unblocked" tiles
     let mut map = vec![vec![Tile::wall(); MAP_HEIGHT as usize]; MAP_WIDTH as usize];
 
     let mut rooms = vec![];
-    let mut starting_position = (0, 0);
 
     for _ in 0..MAX_ROOMS {
         // random width and height
@@ -229,12 +242,17 @@ fn make_map() -> (Map, (i32, i32)) {
             // paint it to the map's tiles
             create_room(new_room, &mut map);
 
+            // add some content to this room, such as monsters
+            place_objects(new_room, objects);
+
             // center coordinates of the new room, will be useful later
             let (new_x, new_y) = new_room.center();
 
             if rooms.is_empty() {
                 // this is the first room, where the player starts at
-                starting_position = (new_x, new_y);
+                // so place them in the center of the room
+                let player = &mut objects[PLAYER];
+                player.set_pos(new_x, new_y);
             } else {
                 // all rooms after the first:
                 // connect it to the previous room with a tunnel
@@ -259,14 +277,14 @@ fn make_map() -> (Map, (i32, i32)) {
     }
 
     // return the map and starting position
-    (map, starting_position)
+    map
 }
 
 /// this function will handle all the rendering needed
 fn render_all(root: &mut Root, con: &mut Offscreen, objects: &[Object], map: &mut Map, fov_map: &mut FovMap, fov_recompute: bool) {
     if fov_recompute {
         // recompute FOV if needed (the player moved or something)
-        let player = &objects[0];
+        let player = &objects[PLAYER];
         fov_map.compute_fov(player.x, player.y, TORCH_RADIUS, FOV_LIGHT_WALLS, FOV_ALGO);
 
         // draw the map tiles, setting background colors
@@ -321,5 +339,24 @@ fn create_h_tunnel(x1: i32, x2: i32, y: i32, map: &mut Map) {
 fn create_v_tunnel(y1: i32, y2: i32, x: i32, map: &mut Map) {
     for y in cmp::min(y1, y2)..(cmp::max(y1, y2) + 1) {
         map[x as usize][y as usize] = Tile::empty();
+    }
+}
+
+/// take a room and add objects to it (monsters, items, etc)
+fn place_objects(room: Rect, objects: &mut Vec<Object>) {
+    // choose a random number of monsters
+    let num_monsters = rand::thread_rng().gen_range(0, MAX_ROOM_MONSTERS + 1);
+
+    for _ in 0..num_monsters {
+        // choose random spot for this monster
+        let x = rand::thread_rng().gen_range(room.x1 + 1, room.x2);
+        let y = rand::thread_rng().gen_range(room.y1 + 1, room.y2);
+
+        let monster = if rand::random::<f32>() < 0.8 { // 80% chance of getting an orc
+            Object::new(x, y, 'o', colors::DESATURATED_GREEN)
+        } else {
+            Object::new(x, y, 'T', colors::DARKER_GREEN) // else, a troll
+        };
+        objects.push(monster);
     }
 }
