@@ -52,6 +52,8 @@ struct Object {
     name: String,
     blocks: bool,
     alive: bool,
+    fighter: Option<Fighter>,
+    ai: Option<Ai>,
 }
 
 impl Object {
@@ -64,6 +66,8 @@ impl Object {
             name: name.into(),
             blocks: blocks,
             alive: false,
+            fighter: None,
+            ai: None,
         }
     }
 
@@ -89,6 +93,19 @@ impl Object {
         self.y = y;
     }
 }
+
+// combat-related properties and methods (monster, player, NPC)
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Fighter {
+    max_hp: i32,
+    hp: i32,
+    defense: i32,
+    power: i32,
+}
+
+// woot, ai
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Ai;
 
 // a tile of the map and its properties
 #[derive(Clone, Copy, Debug)]
