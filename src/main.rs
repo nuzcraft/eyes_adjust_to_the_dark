@@ -195,6 +195,15 @@ fn main() {
         if player_action == PlayerAction::Exit {
             break
         }
+        // let monsters take their turn
+        if objects[PLAYER].alive && player_action != PlayerAction::DidntTakeTurn {
+            for object in &objects {
+                // only if object is not player
+                if (object as *const _) != (&objects[PLAYER] as *const _) {
+                    println!("The {} growls!", object.name);
+                }
+            }
+        }
     }
 
 }
@@ -219,19 +228,19 @@ fn handle_keys(root: &mut Root, map: &Map, objects: &mut [Object]) -> PlayerActi
         (Key {code: Escape, ..}, _) => Exit, // exit game
         // movement keys
         (Key {code: Up, ..}, true) => {
-            move_by(PLAYER, 0, -1, map, objects);
+            player_move_or_attack(0, -1, map, objects);
             TookTurn
         },
         (Key {code: Down, ..}, true) => {
-            move_by(PLAYER, 0, 1, map, objects);
+            player_move_or_attack(0, 1, map, objects);
             TookTurn
         },
         (Key {code: Left, ..}, true) => {
-            move_by(PLAYER, -1, 0, map, objects);
+            player_move_or_attack(-1, 0, map, objects);
             TookTurn
         },
         (Key {code: Right, ..}, true) => {
-            move_by(PLAYER, 1, 0, map, objects);
+            player_move_or_attack(1, 0, map, objects);
             TookTurn
         },
         _ => DidntTakeTurn,
@@ -403,5 +412,26 @@ fn move_by(id: usize, dx: i32, dy: i32, map: &Map, objects: &mut [Object]) {
     let (x, y) = objects[id].pos();
     if !is_blocked(x + dx, y + dy, map, objects){
         objects[id].set_pos(x + dx, y + dy);
+    }
+}
+
+fn player_move_or_attack(dx: i32, dy: i32, map: &Map, objects: &mut [Object]) {
+    // the coordinates the player is moving to/attacking
+    let x = objects[PLAYER].x + dx;
+    let y = objects[PLAYER].y + dy;
+
+    // try to find an attackable object there
+    let target_id = objects.iter().position(|object| {
+        object.pos() == (x, y)
+    });
+
+    // attack if target found, move otherwise
+    match target_id {
+        Some(target_id) => {
+            println!("The {} laughs at your puny efforts to attack it!", objects[target_id].name);
+        }
+        None => {
+            move_by(PLAYER, dx, dy, map, objects);
+        }
     }
 }
