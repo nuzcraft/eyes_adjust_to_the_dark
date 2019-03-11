@@ -177,6 +177,7 @@ fn main() {
     // player variables
     let mut player = Object::new(0, 0, '@', "player", colors::WHITE, true);
     player.alive = true;
+    player.fighter = Some(Fighter{max_hp: 30, hp: 30, defense: 2, power: 5});
     let mut objects = vec![player];
 
     // map
@@ -400,9 +401,14 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<Object>) {
         let y = rand::thread_rng().gen_range(room.y1 + 1, room.y2);
 
         let mut monster = if rand::random::<f32>() < 0.8 { // 80% chance of getting an orc
-            Object::new(x, y, 'o', "orc", colors::DESATURATED_GREEN, true)
+            let mut orc = Object::new(x, y, 'o', "orc", colors::DESATURATED_GREEN, true);
+            orc.fighter = Some(Fighter{max_hp: 10, hp: 10, defense: 0, power: 3});
+            orc.ai = Some(Ai);
+            orc
         } else {
-            Object::new(x, y, 'T', "troll", colors::DARKER_GREEN, true) // else, a troll
+            let mut troll = Object::new(x, y, 'T', "troll", colors::DARKER_GREEN, true); // else, a troll
+            troll.fighter = Some(Fighter{max_hp: 16, hp: 16, defense: 1, power: 4});
+            troll
         };
 
         // only place it if the tile is not blocked
