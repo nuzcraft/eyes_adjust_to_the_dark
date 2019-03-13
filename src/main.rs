@@ -9,6 +9,8 @@ use tcod::console::*;
 use tcod::colors::{self, Color};
 use tcod::map::{Map as FovMap, FovAlgorithm}; // the 'Map as FovMap' section renames the tcod fov map
                                               // so that it doesn't conflict with our user defined Map
+use tcod::input::Key;
+use tcod::input::{self, Event, Mouse};
 use rand::Rng;
 
 // const are constants that cannot be changed in code
@@ -235,6 +237,9 @@ fn main() {
         .title("Rust/libtcod tutorial") // name the window
         .init(); // this actually opens the window
 
+    let mut mouse = Default::default();
+    let mut key = Default::default();
+
     let mut con = Offscreen::new(MAP_WIDTH, MAP_HEIGHT); // create an offscreen console the same width and height as the root
                                                          // we'll blit this to the root screen when we're ready    
     let mut panel = Offscreen::new(SCREEN_WIDTH, PANEL_HEIGHT); // this will be used for the gui at the bottom of the screen
@@ -275,7 +280,14 @@ fn main() {
         con.set_default_foreground(colors::WHITE); // this is the color everything will be drawn in unless otherwise specified
         root.clear(); // clear the screen
         let fov_recompute = previous_player_position != (objects[PLAYER].x, objects[PLAYER].y); // only recompute fov if the player moved
-        render_all(&mut root, &mut con, &objects, &mut map, &mut fov_map, fov_recompute, &mut panel, &mut messages); // render everything
+
+        match input::check_for_event(input::MOUSE | input::KEY_PRESS) {
+            Some((_, Event::Mouse(m))) => mouse = m,
+            Some((_, Event::Key(k))) => key = k,
+            _ => key = Default::default(),
+        }
+
+        render_all(&mut root, &mut con, &objects, &mut map, &mut fov_map, fov_recompute, &mut panel, &mut messages, mouse); // render everything
         root.flush(); // draw everything to the window
         for object in &objects {
             object.clear(&mut con);
@@ -283,7 +295,7 @@ fn main() {
         // handle keys and exit game if needed
         let player = &mut objects[PLAYER];
         previous_player_position = player.pos();
-        let player_action = handle_keys(&mut root, &map, &mut objects, &mut messages);
+        let player_action = handle_keys(key, &mut root, &map, &mut objects, &mut messages);
         if player_action == PlayerAction::Exit {
             break
         }
@@ -300,13 +312,11 @@ fn main() {
 
 /// this function will handle all interactions from the player
 /// this will return false if the player wants to continue playing, true to quit
-fn handle_keys(root: &mut Root, map: &Map, objects: &mut [Object], messages: &mut Messages) -> PlayerAction {
+fn handle_keys(key: Key, root: &mut Root, map: &Map, objects: &mut [Object], messages: &mut Messages) -> PlayerAction {
 
-    use tcod::input::Key;
     use tcod::input::KeyCode::*;
     use PlayerAction::*;
 
-    let key = root.wait_for_keypress(true);
     let player_alive = objects[PLAYER].alive;
     match (key, player_alive) {
         (Key {code: Enter, alt: true, ..}, _) => {
@@ -402,7 +412,7 @@ fn make_map(objects: &mut Vec<Object>) -> Map {
 
 /// this function will handle all the rendering needed
 fn render_all(root: &mut Root, con: &mut Offscreen, objects: &[Object], map: &mut Map, fov_map: &mut FovMap, fov_recompute: bool,
-              panel: &mut Offscreen, messages: &mut Messages) {
+              panel: &mut Offscreen, messages: &mut Messages, mouse: Mouse) {
     if fov_recompute {
         // recompute FOV if needed (the player moved or something)
         let player = &objects[PLAYER];
@@ -460,6 +470,11 @@ fn render_all(root: &mut Root, con: &mut Offscreen, objects: &[Object], map: &mu
         panel.set_default_foreground(color);
         panel.print_rect(MSG_X, y, MSG_WIDTH, 0, msg);
     }
+
+    // display names of objects under the mouse
+    panel.set_default_foreground(colors::LIGHT_GREY);
+    panel.print_ex(1, 0, BackgroundFlag::None, TextAlignment::Left, 
+                   get_names_under_mouse(mouse, objects, fov_map));
 
     // blit the contents of the 'panel' to the root console
     blit(panel, (0, 0), (SCREEN_WIDTH, PANEL_HEIGHT), root, (0, PANEL_Y), 1.0, 1.0);
@@ -660,4 +675,17 @@ fn message<T: Into<String>>(messages: &mut Messages, message: T, color: Color) {
     messages.push((message.into(), color));
     // NOTE: the <T: Into<<String>> bit makes the function generic. anything that implements the 'Into'
     // trait for String can be passed in. ex: &str, String, format! output, etc
+}
+
+fn get_names_under_mouse(mouse: Mouse, objects: &[Object], fov_map: &FovMap) -> String {
+    let (x, y) = (mouse.cx as i32, mouse.cy as i32);
+
+    // create a list with the names of all objects at the mouse's coordinates and in fov
+    let names = objects
+        .iter()
+        .filter(|obj| {obj.pos() == (x, y) && fov_map.is_in_fov(obj.x, obj.y)})
+        .map(|obj| obj.name.clone())
+        .collect::<Vec<_>>();
+
+    names.join(", ") // join the names, separated by commas
 }
