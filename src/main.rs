@@ -7,73 +7,22 @@ extern crate serde;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;
 
+// constants is a separate file that holds all our constants
+mod constants;
+use constants::*;
+
 use std::cmp;
 use std::io::{Read, Write};
 use std::fs::File;
 use std::error::Error;
 use tcod::console::*;
 use tcod::colors::{self, Color};
-use tcod::map::{Map as FovMap, FovAlgorithm}; // the 'Map as FovMap' section renames the tcod fov map
-                                              // so that it doesn't conflict with our user defined Map
+use tcod::map::{Map as FovMap}; // the 'Map as FovMap' section renames the tcod fov map
+                                // so that it doesn't conflict with our user defined Map
 use tcod::input::Key;
 use tcod::input::{self, Event, Mouse};
 use rand::Rng;
 use rand::distributions::{Weighted, WeightedChoice, IndependentSample};
-
-// const are constants that cannot be changed in code
-// actual size of the screen
-const SCREEN_WIDTH: i32 = 80;
-const SCREEN_HEIGHT: i32 = 50;
-const LIMIT_FPS: i32 = 20; // limit frames per second
-
-const MAP_WIDTH: i32 = 80;
-const MAP_HEIGHT: i32 = 43;
-
-// sizes and coordinates relvant for the GUI
-const BAR_WIDTH: i32 = 20;
-const PANEL_HEIGHT: i32 = 7;
-const PANEL_Y: i32 = SCREEN_HEIGHT - PANEL_HEIGHT;
-
-const MSG_X: i32 = BAR_WIDTH + 2;
-const MSG_WIDTH: i32 = SCREEN_WIDTH - BAR_WIDTH - 2;
-const MSG_HEIGHT: usize = PANEL_HEIGHT as usize - 1;
-
-const INVENTORY_WIDTH: i32 = 50;
-
-// parameters for dungeon generator
-const ROOM_MAX_SIZE: i32 = 10;
-const ROOM_MIN_SIZE: i32 = 6;
-const MAX_ROOMS: i32 = 30;
-
-const COLOR_DARK_WALL: Color = Color{r: 0, g: 0, b: 100};
-const COLOR_LIGHT_WALL: Color = Color{r: 130, g: 110, b: 50};
-const COLOR_DARK_GROUND: Color = Color{r: 50, g: 50, b: 150};
-const COLOR_LIGHT_GROUND: Color = Color{r: 200, g: 180, b: 50};
-
-//fov
-const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic;
-const FOV_LIGHT_WALLS: bool = true; // light walls or not
-const TORCH_RADIUS: i32 = 10;
-
-// items
-const HEAL_AMOUNT: i32 = 40;
-const LIGHTNING_DAMAGE: i32 = 40;
-const LIGHTNING_RANGE: i32 = 5;
-const CONFUSE_RANGE: i32 = 8;
-const CONFUSE_NUM_TURNS: i32 = 10;
-const FIREBALL_RADIUS: i32 = 3;
-const FIREBALL_DAMAGE: i32 = 25;
-
-// leveling up
-const LEVEL_UP_BASE: i32 = 200;
-const LEVEL_UP_FACTOR: i32 = 150;
-const LEVEL_SCREEN_WIDTH: i32 = 40;
-
-// character screen
-const CHARACTER_SCREEN_WIDTH: i32 = 30;
-
-// player will always be the first object
-const PLAYER: usize = 0;
 
 type Map = Vec<Vec<Tile>>; // a MAP is 2 dimensional vector of tiles
 
