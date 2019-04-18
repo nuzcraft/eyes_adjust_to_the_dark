@@ -6,7 +6,7 @@ use tcod::console::*;
 use tcod::colors::{self, Color};
 use tcod::map::{Map as FovMap}; // the 'Map as FovMap' section renames the tcod fov map
                                 // so that it doesn't conflict with our user defined Map
-use tcod::input::{Mouse};
+use tcod::input::{self, Event, Mouse};
 
 /// this function will handle all the rendering needed
 pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_recompute: bool) {
@@ -127,4 +127,112 @@ fn get_names_under_mouse(mouse: Mouse, objects: &[Object], fov_map: &FovMap) -> 
         .collect::<Vec<_>>();
 
     names.join(", ") // join the names, separated by commas
+}
+
+pub fn menu<T: AsRef<str>>(header: &str, options: &[T], width: i32, root: &mut Root) -> Option<usize> {
+    // cannot have more than 26 options (a-z)
+    assert!(options.len() <= 26, "Cannot have a menu with more than 26 options.");
+
+    // calculate total height for the header (after auto-wrap) and one line per option
+    let header_height = if header.is_empty() {
+        0
+    } else {
+        root.get_height_rect(0, 0, width, SCREEN_HEIGHT, header)
+    };
+    let height = options.len() as i32 + header_height;
+
+    // create an offscreen console that represents the menu's window
+    let mut window = Offscreen::new(width, height);
+
+    // print the header, with auto-wrap
+    window.set_default_foreground(colors::WHITE);
+    window.print_rect_ex(0, 0, width, height, BackgroundFlag::None, TextAlignment::Left, header);
+
+    // print all the options
+    for (index, option_text) in options.iter().enumerate() {
+        let menu_letter = (b'a' + index as u8) as char;
+        let text = format!("({}) {}", menu_letter, option_text.as_ref());
+        window.print_ex(0, header_height + index as i32, BackgroundFlag::None, TextAlignment::Left, text);
+    }
+
+    // blit the contents of 'window' to the root console
+    let x = SCREEN_WIDTH / 2 - width / 2;
+    let y = SCREEN_HEIGHT / 2 - height / 2;
+    tcod::console::blit(&mut window, (0, 0), (width, height), root, (x, y), 1.0, 0.7);
+
+    // present the root console tot he player and wait for keypress
+    root.flush();
+    let key = root.wait_for_keypress(true);
+
+    // convert the ASCII code to an index; if it correspons to an option, return it
+    if key.printable.is_alphabetic() {
+        let index = key.printable.to_ascii_lowercase() as usize - 'a' as usize;
+        if index < options.len() {
+            Some(index)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+pub fn msgbox(text: &str, width: i32, root: &mut Root) {
+    let options: &[&str] = &[];
+    menu(text, options, width, root);
+}
+
+/// return the position of a tile left-clicked in player's FOV (optionally in a 
+/// range), or (None, None) if right clicked.
+pub fn target_tile(tcod: &mut Tcod,
+                objects: &[Object],
+                game: &mut Game,
+                max_range: Option<f32>) -> Option<(i32, i32)> {
+    use tcod::input::KeyCode::Escape;
+    loop {
+        // render the screen. This erases the inventory and shows the names of
+        // objects under the mouse.
+        tcod.root.flush();
+        let event = input::check_for_event(input::KEY_PRESS | input::MOUSE).map(|e| e.1);
+        let mut key = None;
+        match event {
+            Some(Event::Mouse(m)) => tcod.mouse = m,
+            Some(Event::Key(k)) => key = Some(k),
+            None => {}
+        }
+        render_all(tcod, objects, game, false);
+        let (x, y) = (tcod.mouse.cx as i32, tcod.mouse.cy as i32);
+
+        // accept the target if the player clicked in FOV, and in case a range
+        // is specified, if  it's within that range
+        let in_fov = (x < MAP_WIDTH) && (y < MAP_HEIGHT) && tcod.fov.is_in_fov(x, y);
+        let in_range = max_range.map_or(true, |range| objects[PLAYER].distance(x, y) <= range);
+        if tcod.mouse.lbutton_pressed && in_fov && in_range {
+            return Some((x, y))
+        }
+
+        let escape = key.map_or(false, |k| k.code == Escape);
+        if tcod.mouse.rbutton_pressed || escape {
+            return None // cancel if the player right-clicked or pressed Escape
+        }
+    }
+}
+
+pub fn target_monster(tcod: &mut Tcod,
+                objects: &[Object],
+                game: &mut Game,
+                max_range: Option<f32>) -> Option<usize> {
+    loop {
+        match target_tile(tcod, objects, game, max_range) {
+            Some((x, y)) => {
+                // return the first clicked monster, otherwise continue looping
+                for (id, obj) in objects.iter().enumerate() {
+                    if obj.pos() == (x, y) && obj.fighter.is_some()  && id != PLAYER {
+                        return Some(id)
+                    }
+                }
+            }
+            None => return None,
+        }
+    }
 }
