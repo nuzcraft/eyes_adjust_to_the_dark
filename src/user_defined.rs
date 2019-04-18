@@ -341,6 +341,38 @@ pub enum DeathCallback {
     Monster,
 }
 
+// todo: move this somewhere else (need to reference player_death and monster_death)
+impl DeathCallback {
+    fn callback(self, object: &mut Object, game: &mut Game) {
+        use DeathCallback::*;
+        let callback: fn(&mut Object, &mut Game) = match self {
+            Player => player_death,
+            Monster => monster_death,
+        };
+        callback(object, game);
+    }
+}
+
+fn player_death(player: &mut Object, game: &mut Game) {
+    // the game ended!
+    game.log.add("You died!", colors::RED);
+
+    // for added affect, transform the player into a corpse!
+    player.char = '%';
+    player.color = colors::DARK_RED;
+}
+
+fn monster_death(monster: &mut Object, game: &mut Game) {
+    // transform it into a nasty corpse! it doesn't block, can't be attacked, and doesn't move
+    game.log.add(format!("{} is dead! You gain {} experience points.", monster.name, monster.fighter.unwrap().xp), colors::ORANGE);
+    monster.char = '%';
+    monster.color = colors::DARK_RED;
+    monster.blocks = false;
+    monster.fighter = None;
+    monster.ai = None;
+    monster.name = format!("remains of {}", monster.name);
+}
+
 // traits
 pub trait MessageLog {
     fn add<T: Into<String>>(&mut self, message: T, color: Color);
