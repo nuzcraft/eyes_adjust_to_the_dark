@@ -262,3 +262,15 @@ pub fn inventory_menu(game: &mut Game, header: &str, root: &mut Root) -> Option<
         None
     }
 }
+
+pub fn initialize_fov(map: &Map, tcod: &mut Tcod) {
+    // create the FOV map, according to the generated map
+    for y in 0..MAP_HEIGHT {
+        for x in 0..MAP_WIDTH {
+            tcod.fov.set(x, y,
+                !map[x as usize][y as usize].block_sight,
+                !map[x as usize][y as usize].blocked);
+        }
+    }
+    tcod.con.clear() // unexplored areas start black (which is the default background color)
+}

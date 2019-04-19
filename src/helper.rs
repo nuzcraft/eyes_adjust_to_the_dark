@@ -1,7 +1,10 @@
 /// this file will hold functions used by a variety of things
 use crate::constants::*;
 use crate::user_defined::*;
+use crate::render::*;
+use crate::spells::*;
 
+use tcod::colors::{self};
 use std::cmp;
 
 pub fn is_blocked(x: i32, y:i32, map: &Map, objects: &[Object]) -> bool {
@@ -97,3 +100,124 @@ pub fn get_equipped_in_slot(slot: Slot, inventory: &[Object]) -> Option<usize> {
     }
     None
 }
+
+pub fn player_move_or_attack(dx: i32, dy: i32, game: &mut Game, objects: &mut [Object]) {
+    // the coordinates the player is moving to/attacking
+    let x = objects[PLAYER].x + dx;
+    let y = objects[PLAYER].y + dy;
+
+    // try to find an attackable object there
+    let target_id = objects.iter().position(|object| {
+        object.fighter.is_some() && object.pos() == (x, y)
+    });
+
+    // attack if target found, move otherwise
+    match target_id {
+        Some(target_id) => {
+            let (player, target) = mut_two(PLAYER, target_id, objects);
+            player.attack(target, game);
+        }
+        None => {
+            move_by(PLAYER, dx, dy, game, objects);
+        }
+    }
+}
+
+/// add to the player's inventory and remove from the map
+pub fn pick_item_up(object_id: usize, objects: &mut Vec<Object>, game: &mut Game) {
+    if game.inventory.len() >= 26 {
+        game.log.add(format!("Your inventory is full, cannot pick up {}.", objects[object_id].name), colors::RED);
+    } else {
+        let item = objects.swap_remove(object_id);
+        game.log.add(format!("You picked up a {}!", item.name), colors::GREEN);
+        let index = game.inventory.len();
+        let slot = item.equipment.map(|e| e.slot);
+        game.inventory.push(item);
+
+        // automatically equip, if the corresponding equipment slot is unused
+        if let Some(slot) = slot {
+            if get_equipped_in_slot(slot, &game.inventory).is_none() {
+                game.inventory[index].equip(&mut game.log);
+            }
+        }
+    }
+}
+
+pub fn use_item(inventory_id: usize, objects: &mut [Object], game: &mut Game, tcod: &mut Tcod) {
+    use Item::*;
+    // just call the 'use_function' if it's defined
+    if let Some(item) = game.inventory[inventory_id].item {
+        let on_use: fn(usize, &mut [Object], &mut Game, &mut Tcod) -> UseResult = match item {
+            Heal => cast_heal,
+            Lightning => cast_lightning,
+            Confuse => cast_confuse,
+            Fireball => cast_fireball,
+            Sword => toggle_equipment,
+            Shield => toggle_equipment,
+        };
+        match on_use(inventory_id, objects, game, tcod) {
+            UseResult::UsedUp => {
+                // destroy after use, unless it was cancelled for some reason
+                game.inventory.remove(inventory_id);
+            }
+            UseResult::UsedAndKept => {}, // do nothing
+            UseResult::Cancelled => {
+                game.log.add("Cancelled", colors::WHITE);
+            }
+        }
+    } else {
+        game.log.add(format!("The {} cannot be used.", game.inventory[inventory_id].name), colors::WHITE);
+    }
+}
+
+pub fn drop_item(inventory_id: usize,
+            game: &mut Game,
+            objects: &mut Vec<Object>) {
+    let mut item = game.inventory.remove(inventory_id);
+    if item.equipment.is_some() {
+        item.dequip(&mut game.log);
+    }
+    item.set_pos(objects[PLAYER].x, objects[PLAYER].y);
+    game.log.add(format!("You dropped a {}.", item.name), colors::YELLOW);
+    objects.push(item);
+}
+
+pub fn level_up(objects: &mut [Object], game: &mut Game, tcod: &mut Tcod) {
+    let player = &mut objects[PLAYER];
+    let level_up_xp = LEVEL_UP_BASE + player.level * LEVEL_UP_FACTOR;
+    // see if the player's experience is enought to level up
+    if player.fighter.as_ref().map_or(0, |f| f.xp) >= level_up_xp {
+        // it is! level up
+        player.level += 1;
+        game.log.add(format!("Your battle skills grow stringer! You reached level {}!", player.level), colors::YELLOW);
+        // increase player's stats
+        let fighter = player.fighter.as_mut().unwrap();
+        let mut choice = None;
+        while choice.is_none() {
+            // keep asking until a choice is made
+            choice = menu(
+                "Level up! Choose a stat to raise:\n",
+                &[format!("Constitution (+20 HP, from {})", fighter.base_max_hp),
+                format!("Strength (+1 attack, from {}", fighter.base_power),
+                format!("Agility (+1 defense, from {}", fighter.base_defense)],
+                LEVEL_SCREEN_WIDTH, 
+                &mut tcod.root
+            );
+        };
+        fighter.xp -= level_up_xp;
+        match choice.unwrap() {
+            0 => {
+                fighter.base_max_hp += 20;
+                fighter.hp += 20;
+            }
+            1 => {
+                fighter.base_power += 1;
+            }
+            2 => {
+                fighter.base_defense += 1;
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
