@@ -97,29 +97,3 @@ pub fn get_equipped_in_slot(slot: Slot, inventory: &[Object]) -> Option<usize> {
     }
     None
 }
-
-fn inventory_menu(game: &mut Game, header: &str, root: &mut Root) -> Option<usize> {
-    // show a menu with each item of the inventory as an option
-    let options = if game.inventory.len() == 0 {
-        vec!["Inventory is empty.".into()]
-    } else {
-        game.inventory.iter().map(|item| {
-            // show additional information, in case it's equipped
-            match item.equipment {
-                Some(equipment) if equipment.equipped => {
-                    format!("{} (on {})", item.name, equipment.slot)
-                }
-                _ => item.name.clone()
-            }
-        }).collect()
-    };
-
-    let inventory_index = menu(header, &options, INVENTORY_WIDTH, root);
-
-    // if an item was chosen, return it
-    if game.inventory.len() > 0 {
-        inventory_index
-    } else {
-        None
-    }
-}
