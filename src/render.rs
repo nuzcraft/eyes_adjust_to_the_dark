@@ -15,18 +15,44 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
         let player = &objects[PLAYER];
         tcod.fov.compute_fov(player.x, player.y, TORCH_RADIUS, FOV_LIGHT_WALLS, FOV_ALGO);
 
+        // find objects that emit light, and set their fovs as well
+        // TODO: store these elsewhere
+        // we can't store them on the objects because we can't write the FOV to file when we save (and don't really want to)
+        let mut fovs = vec![];
+        for object in objects {
+            if object.emit_light {
+                // since it emits light, create an FOV
+                let mut fov = FovMap::new(MAP_WIDTH, MAP_HEIGHT);
+                for y in 0..MAP_HEIGHT {
+                    for x in 0..MAP_WIDTH {
+                        fov.set(x, y,
+                            !game.map[x as usize][y as usize].block_sight,
+                            !game.map[x as usize][y as usize].blocked);
+                    }
+                }
+                fov.compute_fov(object.x, object.y, object.emit_light_radius, FOV_LIGHT_WALLS, FOV_ALGO);
+                fovs.push(fov);
+            }
+        }
+
         // draw the map tiles, setting background colors
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
                 let visible = tcod.fov.is_in_fov(x, y);
+                // also visible if in the light of an emitter
+                let mut torchlight: bool = false;
+                for torch_fov in &fovs {
+                    torchlight = torch_fov.is_in_fov(x, y);
+                }
                 let wall = game.map[x as usize][y as usize].block_sight;
-                let color = match(visible, wall) {
+                let color = match(visible, wall, torchlight) {
                     // outside field of view
-                    (false, true) => COLOR_DARK_WALL,
-                    (false, false) => COLOR_DARK_GROUND,
+                    (false, true, false) => COLOR_DARK_WALL,
+                    (false, false, false) => COLOR_DARK_GROUND,
                     // inside fov:COLOR_DARK_GROUND
-                    (true, true) => COLOR_LIGHT_WALL,
-                    (true, false) => COLOR_LIGHT_GROUND,    
+                    (true, true, false) => COLOR_LIGHT_WALL,
+                    (true, false, false) => COLOR_LIGHT_GROUND,
+                    _ => colors::ORANGE,    
                 };
                 let explored = &mut game.map[x as usize][y as usize].explored;
                 if visible {

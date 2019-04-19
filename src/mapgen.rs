@@ -49,6 +49,16 @@ pub fn make_map(objects: &mut Vec<Object>, level: u32) -> Map {
                 // so place them in the center of the room
                 let player = &mut objects[PLAYER];
                 player.set_pos(new_x, new_y);
+
+                // TESTING
+                // creating a light at the beginning  of the game
+                let mut light = Object::new(0, 0, 'i', "torch", colors::DARKER_ORANGE, false);
+                light.always_visible = true;
+                light.emit_light = true;
+                light.emit_light_radius = 3;
+                light.set_pos(new_x + 1, new_y + 1);
+                objects.push(light);
+
             } else {
                 // all rooms after the first:
                 // connect it to the previous room with a tunnel

@@ -23,6 +23,8 @@ pub struct Object {
     pub always_visible: bool,
     pub level: i32,
     pub equipment: Option<Equipment>,
+    pub emit_light: bool, // lights and monsters with lanterns can emit light
+    pub emit_light_radius: i32,
 }
 
 impl Object {
@@ -41,6 +43,8 @@ impl Object {
             always_visible: false,
             level: 1,
             equipment: None,
+            emit_light: false,
+            emit_light_radius: 0,
         }
     }
 
