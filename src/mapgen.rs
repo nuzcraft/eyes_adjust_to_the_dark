@@ -50,15 +50,6 @@ pub fn make_map(objects: &mut Vec<Object>, level: u32) -> Map {
                 let player = &mut objects[PLAYER];
                 player.set_pos(new_x, new_y);
 
-                // TESTING
-                // creating a light at the beginning  of the game
-                let mut light = Object::new(0, 0, 'i', "torch", colors::DARKER_ORANGE, false);
-                light.always_visible = true;
-                light.emit_light = true;
-                light.emit_light_radius = 3;
-                light.set_pos(new_x + 1, new_y + 1);
-                objects.push(light);
-
             } else {
                 // all rooms after the first:
                 // connect it to the previous room with a tunnel
@@ -222,6 +213,26 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<Object>, level: u32) {
             objects.push(item);
         }
     }
+
+    // max number of torches per room
+    let max_torches = 1;
+    // choose a random number of torches
+    let num_torches = rand::thread_rng().gen_range(0, max_torches + 1);
+    for _ in 0..num_torches {
+        let x = rand::thread_rng().gen_range(room.x1 + 1, room.x2);
+        let y = rand::thread_rng().gen_range(room.y1 + 1, room.y2);
+
+        // only place it if the tile is not blocked
+        if !is_blocked(x, y, map, objects) {
+            let mut torch = Object::new(x, y, 'i', "torch", colors::DARKEST_ORANGE, false);
+            torch.emit_light = true;
+            torch.emit_light_radius = 2;
+            torch.always_visible = true;
+            objects.push(torch);
+        }
+    }
+
+
 }
 
 fn create_h_tunnel(x1: i32, x2: i32, y: i32, map: &mut Map) {

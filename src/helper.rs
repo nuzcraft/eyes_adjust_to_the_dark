@@ -5,6 +5,7 @@ use crate::render::*;
 use crate::spells::*;
 
 use tcod::colors::{self};
+use tcod::map::{Map as FovMap};
 use std::cmp;
 
 pub fn is_blocked(x: i32, y:i32, map: &Map, objects: &[Object]) -> bool {
@@ -219,5 +220,18 @@ pub fn level_up(objects: &mut [Object], game: &mut Game, tcod: &mut Tcod) {
             _ => unreachable!(),
         }
     }
+}
+
+/// initializes an FOV map based on the MAP_HEIGHT and MAP_WIDTH, using game.map
+pub fn create_fov_map(game: &Game) -> FovMap {
+    let mut fov_map = FovMap::new(MAP_WIDTH, MAP_HEIGHT);
+    for y in 0..MAP_HEIGHT {
+        for x in 0..MAP_WIDTH {
+            fov_map.set(x, y, 
+                !game.map[x as usize][y as usize].block_sight,
+                !game.map[x as usize][y as usize].blocked);
+        }
+    }
+    fov_map
 }
 

@@ -1,6 +1,7 @@
 /// this file will be used to render everything to the screen
 use crate::constants::*;
 use crate::user_defined::*;
+use crate::helper;
 
 use tcod::console::*;
 use tcod::colors::{self, Color};
@@ -16,43 +17,40 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
         tcod.fov.compute_fov(player.x, player.y, TORCH_RADIUS, FOV_LIGHT_WALLS, FOV_ALGO);
 
         // find objects that emit light, and set their fovs as well
-        // TODO: store these elsewhere
         // we can't store them on the objects because we can't write the FOV to file when we save (and don't really want to)
-        let mut fovs = vec![];
+        let mut emmitter_fovs = vec![];
         for object in objects {
             if object.emit_light {
                 // since it emits light, create an FOV
-                let mut fov = FovMap::new(MAP_WIDTH, MAP_HEIGHT);
-                for y in 0..MAP_HEIGHT {
-                    for x in 0..MAP_WIDTH {
-                        fov.set(x, y,
-                            !game.map[x as usize][y as usize].block_sight,
-                            !game.map[x as usize][y as usize].blocked);
-                    }
-                }
-                fov.compute_fov(object.x, object.y, object.emit_light_radius, FOV_LIGHT_WALLS, FOV_ALGO);
-                fovs.push(fov);
+                let mut fov_map = helper::create_fov_map(game);
+                fov_map.compute_fov(object.x, object.y, object.emit_light_radius, FOV_LIGHT_WALLS, FOV_ALGO);
+                emmitter_fovs.push(fov_map);
             }
         }
 
         // draw the map tiles, setting background colors
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
-                let visible = tcod.fov.is_in_fov(x, y);
                 // also visible if in the light of an emitter
-                let mut torchlight: bool = false;
-                for torch_fov in &fovs {
-                    torchlight = torch_fov.is_in_fov(x, y);
+                let mut emmitter_light: bool = false;
+                for fov in &emmitter_fovs {
+                    emmitter_light = fov.is_in_fov(x, y);
+                    if emmitter_light == true {
+                        break;
+                    }
+                }
+                let mut visible = tcod.fov.is_in_fov(x, y); // this is the players fov
+                if emmitter_light == true && visible == false {
+                    visible = true;
                 }
                 let wall = game.map[x as usize][y as usize].block_sight;
-                let color = match(visible, wall, torchlight) {
+                let color = match(visible, wall) {
                     // outside field of view
-                    (false, true, false) => COLOR_DARK_WALL,
-                    (false, false, false) => COLOR_DARK_GROUND,
+                    (false, true) => COLOR_DARK_WALL,
+                    (false, false) => COLOR_DARK_GROUND,
                     // inside fov:COLOR_DARK_GROUND
-                    (true, true, false) => COLOR_LIGHT_WALL,
-                    (true, false, false) => COLOR_LIGHT_GROUND,
-                    _ => colors::ORANGE,    
+                    (true, true) => COLOR_LIGHT_WALL,
+                    (true, false) => COLOR_LIGHT_GROUND,   
                 };
                 let explored = &mut game.map[x as usize][y as usize].explored;
                 if visible {
