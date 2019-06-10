@@ -32,19 +32,27 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
                 // also visible if in the light of an emitter
-                let mut emmitter_light: bool = false;
+                let mut in_emmitter_light: bool = false;
                 for fov in &emmitter_fovs {
-                    emmitter_light = fov.is_in_fov(x, y);
-                    if emmitter_light == true {
+                    in_emmitter_light = fov.is_in_fov(x, y);
+                    if in_emmitter_light == true {
                         break;
                     }
                 }
-                let mut visible = tcod.fov.is_in_fov(x, y); // this is the players fov
-                if emmitter_light == true && visible == false {
-                    visible = true;
+                // if the tile is in the emmitter light, set it to lit, else set lit to false. This should let us
+                // light and unlight tiles, but allow previously lit tiles to be explored
+                let lit = &mut game.map[x as usize][y as usize].lit;
+                if in_emmitter_light {
+                    *lit = true;
+                } else {
+                    *lit = false;
                 }
+
+                let visible_to_player = tcod.fov.is_in_fov(x, y); // this is the players fov
                 let wall = game.map[x as usize][y as usize].block_sight;
-                let color = match(visible, wall) {
+
+                // for now, make the tiles visible to the player or in emitter light the same color
+                let color = match(visible_to_player || in_emmitter_light, wall) {
                     // outside field of view
                     (false, true) => COLOR_DARK_WALL,
                     (false, false) => COLOR_DARK_GROUND,
@@ -53,7 +61,7 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
                     (true, false) => COLOR_LIGHT_GROUND,   
                 };
                 let explored = &mut game.map[x as usize][y as usize].explored;
-                if visible {
+                if visible_to_player || in_emmitter_light {
                     // since it's visible, explore it
                     *explored = true;
                 }
@@ -63,10 +71,14 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
             }
         }
     }
+
+    // draw objects that are a) in players fov b) in a lit area c) are always visible and in an explored area
     let mut to_draw: Vec<_> = objects.iter().filter(|o| {
         tcod.fov.is_in_fov(o.x, o.y) || 
+        game.map[o.x as usize][o.y as usize].lit ||
         (o.always_visible && game.map[o.x as usize][o.y as usize].explored)
     }).collect();
+
     // sort so that non-blocking objects come first
     to_draw.sort_by(|o1, o2| {o1.blocks.cmp(&o2.blocks)});
     // draw all objects in the list

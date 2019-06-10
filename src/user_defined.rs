@@ -215,15 +215,16 @@ pub struct Tile {
     pub blocked: bool,
     pub block_sight: bool,
     pub explored: bool,
+    pub lit: bool,
 }
 
 impl Tile {
     pub fn empty() -> Self {
-        Tile{blocked: false, block_sight: false, explored: false}
+        Tile{blocked: false, block_sight: false, explored: false, lit: false}
     }
 
     pub fn wall() -> Self {
-        Tile{blocked: true, block_sight: true, explored: false}
+        Tile{blocked: true, block_sight: true, explored: false, lit: false}
     }
 }
 
