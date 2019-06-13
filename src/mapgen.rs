@@ -225,8 +225,7 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<Object>, level: u32) {
         // only place it if the tile is not blocked
         if !is_blocked(x, y, map, objects) {
             let mut torch = Object::new(x, y, 'i', "torch", colors::DARKEST_ORANGE, false);
-            torch.emit_light = true;
-            torch.emit_light_radius = 2;
+            torch.emitter = Some(Emitter{radius: 2, color: colors::DARKEST_ORANGE});
             torch.always_visible = true;
             objects.push(torch);
         }

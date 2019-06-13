@@ -15,13 +15,13 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
 
         // find objects that emit light, and set their fovs as well
         // we can't store them on the objects because we can't write the FOV to file when we save (and don't really want to)
-        let mut emmitter_fovs = vec![];
+        let mut emitter_fovs = vec![];
         for object in objects {
-            if object.emit_light {
+            if object.emitter.is_some() {
                 // since it emits light, create an FOV
                 let mut fov_map = helper::create_fov_map(game);
-                fov_map.compute_fov(object.x, object.y, object.emit_light_radius, FOV_LIGHT_WALLS, FOV_ALGO);
-                emmitter_fovs.push(fov_map);
+                fov_map.compute_fov(object.x, object.y, object.emitter.as_ref().map_or(0, |f| f.radius), FOV_LIGHT_WALLS, FOV_ALGO);
+                emitter_fovs.push(fov_map);
             }
         }
 
@@ -29,17 +29,17 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
                 // also visible if in the light of an emitter
-                let mut in_emmitter_light: bool = false;
-                for fov in &emmitter_fovs {
-                    in_emmitter_light = fov.is_in_fov(x, y);
-                    if in_emmitter_light == true {
+                let mut in_emitter_light: bool = false;
+                for fov in &emitter_fovs {
+                    in_emitter_light = fov.is_in_fov(x, y);
+                    if in_emitter_light == true {
                         break;
                     }
                 }
                 // if the tile is in the emmitter light, set it to lit, else set lit to false. This should let us
                 // light and unlight tiles, but allow previously lit tiles to be explored
                 let lit = &mut game.map[x as usize][y as usize].lit;
-                if in_emmitter_light {
+                if in_emitter_light {
                     *lit = true;
                 } else {
                     *lit = false;

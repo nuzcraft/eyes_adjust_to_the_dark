@@ -23,8 +23,7 @@ pub struct Object {
     pub always_visible: bool,
     pub level: i32,
     pub equipment: Option<Equipment>,
-    pub emit_light: bool, // lights and monsters with lanterns can emit light
-    pub emit_light_radius: i32,
+    pub emitter: Option<Emitter>,
 }
 
 impl Object {
@@ -43,8 +42,7 @@ impl Object {
             always_visible: false,
             level: 1,
             equipment: None,
-            emit_light: false,
-            emit_light_radius: 0,
+            emitter: None,
         }
     }
 
@@ -207,6 +205,13 @@ pub struct Fighter {
     pub base_power: i32,
     pub on_death: DeathCallback,
     pub xp: i32,
+}
+
+// properties of a light emitter (radius, color)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Emitter {
+    pub radius: i32,
+    pub color: colors::Color,
 }
 
 // a tile of the map and its properties
