@@ -12,9 +12,6 @@ use tcod::input::{self, Event, Mouse};
 /// this function will handle all the rendering needed
 pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_recompute: bool) {
     if fov_recompute {
-        // recompute FOV if needed (the player moved or something)
-        let player = &objects[PLAYER];
-        tcod.fov.compute_fov(player.x, player.y, TORCH_RADIUS, FOV_LIGHT_WALLS, FOV_ALGO);
 
         // find objects that emit light, and set their fovs as well
         // we can't store them on the objects because we can't write the FOV to file when we save (and don't really want to)
@@ -28,7 +25,7 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
             }
         }
 
-        // draw the map tiles, setting background colors
+        // we need to find out which tiles are lit so we can tell if the player is standing in the light
         for y in 0..MAP_HEIGHT {
             for x in 0..MAP_WIDTH {
                 // also visible if in the light of an emitter
@@ -47,12 +44,27 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
                 } else {
                     *lit = false;
                 }
+            }
+        }
 
+        // recompute the player's FOV. if standing on a lit tile, use TORCH_RADIUS_IN_LIT_AREA
+        let player = &objects[PLAYER];
+        let mut torch_radius = TORCH_RADIUS_IN_DARK_AREA;
+        if game.map[player.x as usize][player.y as usize].lit {
+            torch_radius = TORCH_RADIUS_IN_LIT_AREA
+        }
+        tcod.fov.compute_fov(player.x, player.y, torch_radius, FOV_LIGHT_WALLS, FOV_ALGO);
+
+
+        // draw the map tiles, setting background colors
+        for y in 0..MAP_HEIGHT {
+            for x in 0..MAP_WIDTH {
                 let visible_to_player = tcod.fov.is_in_fov(x, y); // this is the players fov
                 let wall = game.map[x as usize][y as usize].block_sight;
+                let lit_tile = game.map[x as usize][y as usize].lit;
 
                 // for now, make the tiles visible to the player or in emitter light the same color
-                let color = match(visible_to_player || in_emmitter_light, wall) {
+                let mut color = match(visible_to_player || lit_tile, wall) {
                     // outside field of view
                     (false, true) => COLOR_DARK_WALL,
                     (false, false) => COLOR_DARK_GROUND,
@@ -60,8 +72,13 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
                     (true, true) => COLOR_LIGHT_WALL,
                     (true, false) => COLOR_LIGHT_GROUND,   
                 };
+                // if lit by torch, adjust the color a smidge
+                if lit_tile {
+                    color = colors::lerp(color, colors::ORANGE, 0.5)
+                }
+
                 let explored = &mut game.map[x as usize][y as usize].explored;
-                if visible_to_player || in_emmitter_light {
+                if visible_to_player || lit_tile {
                     // since it's visible, explore it
                     *explored = true;
                 }

@@ -36,7 +36,8 @@ pub const COLOR_LIGHT_GROUND: Color = Color{r: 200, g: 180, b: 50};
 //fov
 pub const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic;
 pub const FOV_LIGHT_WALLS: bool = true; // light walls or not
-pub const TORCH_RADIUS: i32 = 10;
+pub const TORCH_RADIUS_IN_DARK_AREA: i32 = 10;
+pub const TORCH_RADIUS_IN_LIT_AREA: i32 = 3; // torch radius decreased if standing in light
 
 // items
 pub const HEAL_AMOUNT: i32 = 40;
