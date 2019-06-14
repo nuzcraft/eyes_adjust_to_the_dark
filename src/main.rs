@@ -179,6 +179,7 @@ fn new_game (tcod: &mut Tcod) -> (Vec<Object>, Game) {
     // create object representing the player
     let mut player = Object::new(0, 0, '@', "player", colors::WHITE, true);
     player.alive = true;
+    player.fov_radius = 5; // start here, see how it goes
     player.fighter = Some(Fighter{base_max_hp: 100, hp: 100, base_defense: 1, base_power: 2, on_death: DeathCallback::Player, xp: 0});
 
     // the list of objects with just the player
@@ -227,9 +228,19 @@ fn play_game(objects: &mut Vec<Object>, game: &mut Game, tcod: &mut Tcod) {
             _ => key = Default::default(),
         }
 
+        // update player fov_radius if necessary
+        if game.map[objects[PLAYER].x as usize][objects[PLAYER].y as usize].lit {
+            objects[PLAYER].fov_radius = TORCH_RADIUS_IN_LIT_AREA;
+        } else { // player is in dark area
+            objects[PLAYER].fov_radius += 1;
+            if objects[PLAYER].fov_radius > TORCH_RADIUS_IN_DARK_AREA {
+                objects[PLAYER].fov_radius = TORCH_RADIUS_IN_DARK_AREA;
+            }
+        }
+
         // render the screen
-        let fov_recompute = previous_player_position != (objects[PLAYER].pos());
-        render_all(tcod, &objects, game, fov_recompute);
+        let fov_recompute = previous_player_position != (objects[PLAYER].pos()); // we may need to update this to account for changing fovs
+        render_all(tcod, objects, game, fov_recompute); 
 
         tcod.root.flush();
 

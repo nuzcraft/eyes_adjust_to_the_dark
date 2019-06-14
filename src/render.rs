@@ -49,12 +49,7 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
 
         // recompute the player's FOV. if standing on a lit tile, use TORCH_RADIUS_IN_LIT_AREA
         let player = &objects[PLAYER];
-        let mut torch_radius = TORCH_RADIUS_IN_DARK_AREA;
-        if game.map[player.x as usize][player.y as usize].lit {
-            torch_radius = TORCH_RADIUS_IN_LIT_AREA
-        }
-        tcod.fov.compute_fov(player.x, player.y, torch_radius, FOV_LIGHT_WALLS, FOV_ALGO);
-
+        tcod.fov.compute_fov(player.x, player.y, player.fov_radius, FOV_LIGHT_WALLS, FOV_ALGO);
 
         // draw the map tiles, setting background colors
         for y in 0..MAP_HEIGHT {

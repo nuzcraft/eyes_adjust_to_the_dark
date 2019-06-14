@@ -24,6 +24,7 @@ pub struct Object {
     pub level: i32,
     pub equipment: Option<Equipment>,
     pub emitter: Option<Emitter>,
+    pub fov_radius: i32,
 }
 
 impl Object {
@@ -43,6 +44,7 @@ impl Object {
             level: 1,
             equipment: None,
             emitter: None,
+            fov_radius: 0,
         }
     }
 
