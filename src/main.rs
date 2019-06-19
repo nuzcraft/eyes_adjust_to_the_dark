@@ -228,16 +228,6 @@ fn play_game(objects: &mut Vec<Object>, game: &mut Game, tcod: &mut Tcod) {
             _ => key = Default::default(),
         }
 
-        // update player fov_radius if necessary
-        if game.map[objects[PLAYER].x as usize][objects[PLAYER].y as usize].lit {
-            objects[PLAYER].fov_radius = TORCH_RADIUS_IN_LIT_AREA;
-        } else { // player is in dark area
-            objects[PLAYER].fov_radius += 1;
-            if objects[PLAYER].fov_radius > TORCH_RADIUS_IN_DARK_AREA {
-                objects[PLAYER].fov_radius = TORCH_RADIUS_IN_DARK_AREA;
-            }
-        }
-
         // render the screen
         let fov_recompute = previous_player_position != (objects[PLAYER].pos()); // we may need to update this to account for changing fovs
         render_all(tcod, objects, game, fov_recompute); 
@@ -265,6 +255,21 @@ fn play_game(objects: &mut Vec<Object>, game: &mut Game, tcod: &mut Tcod) {
             for id in 0..objects.len() {
                 if objects[id].ai.is_some() {
                     ai_take_turn(id, game, objects, &tcod.fov);
+                }
+            }
+        }
+
+        // update player fov_radius if necessary
+        // we do this after the monsters take their turn (for now); fov is recomputed in the render_all function
+        // this way the player can predict what the monster is going to do based on the fov when they take a turn
+        // instead of re-computing in between player and monster actions
+        if objects[PLAYER].alive && player_action != PlayerAction::DidntTakeTurn {
+            if game.map[objects[PLAYER].x as usize][objects[PLAYER].y as usize].lit {
+                objects[PLAYER].fov_radius = TORCH_RADIUS_IN_LIT_AREA;
+            } else { // player is in dark area
+                objects[PLAYER].fov_radius += 1;
+                if objects[PLAYER].fov_radius > TORCH_RADIUS_IN_DARK_AREA {
+                    objects[PLAYER].fov_radius = TORCH_RADIUS_IN_DARK_AREA;
                 }
             }
         }
