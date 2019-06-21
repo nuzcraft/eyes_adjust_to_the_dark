@@ -54,6 +54,12 @@ impl Object {
         con.put_char(self.x, self.y, self.char, BackgroundFlag::None);
     }
 
+    /// set the color to black, then draw the character that represents this object at its position
+    pub fn draw_black(&self, con: &mut Console) {
+        con.set_default_foreground(colors::BLACK);
+        con.put_char(self.x, self.y, self.char, BackgroundFlag::None);
+    }
+
     /// Erase the character that represents this object
     pub fn clear(&self, con: &mut Console) {
         con.put_char(self.x, self.y, ' ', BackgroundFlag::None);

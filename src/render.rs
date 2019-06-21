@@ -107,8 +107,15 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
     // sort so that non-blocking objects come first
     to_draw.sort_by(|o1, o2| {o1.blocks.cmp(&o2.blocks)});
     // draw all objects in the list
-    for object in &to_draw {
-        object.draw(&mut tcod.con);
+    // if player is standing in a lit tile use color, else use black
+    if player_lit {
+        for object in &to_draw {
+            object.draw(&mut tcod.con);
+        }
+    } else {
+        for object in &to_draw {
+            object.draw_black(&mut tcod.con);
+        }
     }
 
     // prepare to render the GUI panel
@@ -118,6 +125,7 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
     // show the player's stats
     let hp = objects[PLAYER].fighter.map_or(0, |f| f.hp);
     let max_hp = objects[PLAYER].max_hp(game);
+    // if player is standing in a lit tile, use red, else grey
     if player_lit {
         render_bar(&mut tcod.panel, 1, 1, BAR_WIDTH, "HP", hp, max_hp, colors::LIGHT_RED, colors::DARKER_RED);
     } else {
@@ -130,7 +138,7 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
 
     // show whether the player is in a lit or dark tile
     tcod.panel.print_ex(1, 5, BackgroundFlag::None, TextAlignment::Left,
-        match game.map[objects[PLAYER].x as usize][objects[PLAYER].y as usize].lit {
+        match player_lit {
             true => "Lit",
             false => "Dark",
         });
@@ -143,7 +151,12 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
         if y < 0 {
             break;
         }
-        tcod.panel.set_default_foreground(color);
+        // if player is standing in a lit tile, use color, else just white
+        if player_lit {
+            tcod.panel.set_default_foreground(color);
+        } else {
+            tcod.panel.set_default_foreground(colors::WHITE);
+        }
         tcod.panel.print_rect(MSG_X, y, MSG_WIDTH, 0, msg);
     }
 
