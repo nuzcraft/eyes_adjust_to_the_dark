@@ -111,6 +111,13 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
     tcod.panel.print_ex(1, 3, BackgroundFlag::None, TextAlignment::Left,
         format!("Dungeon level: {}", game.dungeon_level));
 
+    // show whether the player is in a lit or dark tile
+    tcod.panel.print_ex(1, 5, BackgroundFlag::None, TextAlignment::Left,
+        match game.map[objects[PLAYER].x as usize][objects[PLAYER].y as usize].lit {
+            true => "Lit",
+            false => "Dark",
+        });
+
     // print the game messages, one line at a time
     let mut y = MSG_HEIGHT as i32;
     for &(ref msg, color) in game.log.iter().rev() {
