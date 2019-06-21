@@ -11,6 +11,10 @@ use tcod::input::{self, Event, Mouse};
 
 /// this function will handle all the rendering needed
 pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_recompute: bool) {
+
+    let player = &objects[PLAYER];
+    let player_lit = game.map[player.x as usize][player.y as usize].lit;
+
     if fov_recompute {
 
         // find objects that emit light, and set their fovs as well
@@ -48,7 +52,6 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
         }
 
         // recompute the player's FOV. if standing on a lit tile, use TORCH_RADIUS_IN_LIT_AREA
-        let player = &objects[PLAYER];
         tcod.fov.compute_fov(player.x, player.y, player.fov_radius, FOV_LIGHT_WALLS, FOV_ALGO);
 
         // draw the map tiles, setting background colors
@@ -59,17 +62,27 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
                 let lit_tile = game.map[x as usize][y as usize].lit;
 
                 // for now, make the tiles visible to the player or in emitter light the same color
-                let mut color = match(visible_to_player || lit_tile, wall) {
+                // add a match thing for whether the player is lit, so we can move to greyscale
+                let mut color = match(visible_to_player || lit_tile, wall, player_lit) {
                     // outside field of view
-                    (false, true) => COLOR_DARK_WALL,
-                    (false, false) => COLOR_DARK_GROUND,
+                    (false, true, true) => COLOR_DARK_WALL,
+                    (false, true, false) => colors::DARKEST_GREY, //greyscale
+                    (false, false, true) => COLOR_DARK_GROUND,
+                    (false, false, false) => colors::DARKER_GREY, //greyscale
                     // inside fov:COLOR_DARK_GROUND
-                    (true, true) => COLOR_LIGHT_WALL,
-                    (true, false) => COLOR_LIGHT_GROUND,   
+                    (true, true, true) => COLOR_LIGHT_WALL,
+                    (true, true, false) => colors::DARK_GREY, //greyscale
+                    (true, false, true) => COLOR_LIGHT_GROUND, 
+                    (true, false, false) => colors::GREY, //greyscale 
                 };
+
                 // if lit by torch, adjust the color a smidge
                 if lit_tile {
-                    color = colors::lerp(color, colors::ORANGE, 0.5)
+                    if player_lit {
+                        color = colors::lerp(color, colors::ORANGE, 0.5)
+                    } else {
+                        color = colors::lerp(color, colors::LIGHTER_GREY, 0.5)
+                    }
                 }
 
                 let explored = &mut game.map[x as usize][y as usize].explored;
@@ -105,7 +118,11 @@ pub fn render_all(tcod: &mut Tcod, objects: &[Object], game: &mut Game, fov_reco
     // show the player's stats
     let hp = objects[PLAYER].fighter.map_or(0, |f| f.hp);
     let max_hp = objects[PLAYER].max_hp(game);
-    render_bar(&mut tcod.panel, 1, 1, BAR_WIDTH, "HP", hp, max_hp, colors::LIGHT_RED, colors::DARKER_RED);
+    if player_lit {
+        render_bar(&mut tcod.panel, 1, 1, BAR_WIDTH, "HP", hp, max_hp, colors::LIGHT_RED, colors::DARKER_RED);
+    } else {
+        render_bar(&mut tcod.panel, 1, 1, BAR_WIDTH, "HP", hp, max_hp, colors::DARKER_GREY, colors::DARKEST_GREY);
+    }
 
     // show the level of the dungeon
     tcod.panel.print_ex(1, 3, BackgroundFlag::None, TextAlignment::Left,
