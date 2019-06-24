@@ -41,7 +41,7 @@ use tcod::input::{self, Event};
 fn main() {
     
     let root = Root::initializer()
-        .font("arial10x10.png", FontLayout::Tcod) // set up a font. this can be in various formats, must be in the root, next to Cargo.toml
+        .font("arial10x10.png", FontLayout::Tcod) // set up a font. this can be in various formats, must be in the root, next to Cargo.toml        
         .font_type(FontType::Greyscale)
         .size(SCREEN_WIDTH, SCREEN_HEIGHT) // set the dimensions of the window
         .title("Rust/libtcod tutorial") // name the window
