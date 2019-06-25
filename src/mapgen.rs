@@ -8,6 +8,21 @@ use tcod::colors::{self};
 use rand::Rng;
 use rand::distributions::{Weighted, WeightedChoice, IndependentSample};
 
+pub fn make_map_debug(objects: &mut Vec<Object>, level: u32) -> Map {
+    let mut map = vec![vec![Tile::empty(); MAP_HEIGHT as usize]; MAP_WIDTH as usize];
+
+    // player is the first element, remove everything else.
+    // NOTE: works only when the player is the first object!
+    assert_eq!(&objects[PLAYER] as *const _, &objects[0] as *const _);
+    objects.truncate(1);
+
+    let player = &mut objects[PLAYER];
+    player.set_pos(50, 50);
+
+    // return the map
+    map
+}
+
 pub fn make_map(objects: &mut Vec<Object>, level: u32) -> Map {
     // fill map with "unblocked" tiles
     let mut map = vec![vec![Tile::wall(); MAP_HEIGHT as usize]; MAP_WIDTH as usize];
