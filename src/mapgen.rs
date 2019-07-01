@@ -16,8 +16,18 @@ pub fn make_map_debug(objects: &mut Vec<Object>, level: u32) -> Map {
     assert_eq!(&objects[PLAYER] as *const _, &objects[0] as *const _);
     objects.truncate(1);
 
+    // player is the first element, remove everything else.
+    // NOTE: works only when the player is the first object!
+    assert_eq!(&objects[PLAYER] as *const _, &objects[0] as *const _);
+    objects.truncate(1);
+
     let player = &mut objects[PLAYER];
-    player.set_pos(50, 50);
+    player.set_pos(20, 20);
+
+    let mut torch = Object::new(15, 15, 'i', "torch", colors::ORANGE, false);
+    torch.emitter = Some(Emitter{radius: 2, color: colors::ORANGE});
+    torch.always_visible = true;
+    objects.push(torch);
 
     // return the map
     map

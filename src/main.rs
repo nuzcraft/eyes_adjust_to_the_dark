@@ -188,7 +188,8 @@ fn new_game (tcod: &mut Tcod) -> (Vec<Object>, Game) {
     
     let mut game = Game {
         // generate map (at thsi point it's not drawn to the screen)
-        map: make_map(&mut objects, level),
+        // map: make_map(&mut objects, level),
+        map: make_map_debug(&mut objects, level), // debug version, used for testing stuff
         // create the list of game messages and their colors, starts empty
         log: vec![],
         inventory: vec![],
