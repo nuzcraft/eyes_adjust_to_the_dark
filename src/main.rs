@@ -41,7 +41,7 @@ use tcod::input::{self, Event};
 fn main() {
     
     let root = Root::initializer()
-        .font("arial10x10.png", FontLayout::Tcod) // set up a font. this can be in various formats, must be in the root, next to Cargo.toml        
+        .font("cp437_10x10.png", FontLayout::AsciiInRow) // set up a font. this can be in various formats, must be in the root, next to Cargo.toml        
         .font_type(FontType::Greyscale)
         .size(SCREEN_WIDTH, SCREEN_HEIGHT) // set the dimensions of the window
         .title("Rust/libtcod tutorial") // name the window
@@ -282,8 +282,11 @@ fn main_menu(tcod: &mut Tcod) {
         .ok().expect("Background image not found");
     
     while !tcod.root.window_closed() {
+        // make sure root is clear
+        tcod.root.clear();
         // show the background image, at twice the regular console resolution
-        tcod::image::blit_2x(&img, (0, 0), (-1, -1), &mut tcod.root, (0, 0));
+        // blit_2x(src: &Image, (src_x, src_y), (width, height), dst: &mut Console, (dst_x, dst_y))
+        tcod::image::blit_2x(&img, (0, 0), (-1, -1), &mut tcod.root, (0, 5)); // changed dst_y from 0 to 5 to accommodate a larger screen
 
         // add the title and some credits
         tcod.root.set_default_foreground(colors::LIGHT_YELLOW);

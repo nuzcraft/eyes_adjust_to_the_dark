@@ -6,11 +6,11 @@ use tcod::map::{FovAlgorithm};
 
 // actual size of the screen
 pub const SCREEN_WIDTH: i32 = 80;
-pub const SCREEN_HEIGHT: i32 = 50;
+pub const SCREEN_HEIGHT: i32 = 60;
 pub const LIMIT_FPS: i32 = 20; // limit frames per second
 
 pub const MAP_WIDTH: i32 = 80;
-pub const MAP_HEIGHT: i32 = 43;
+pub const MAP_HEIGHT: i32 = 53;
 
 // sizes and coordinates relvant for the GUI
 pub const BAR_WIDTH: i32 = 20;
